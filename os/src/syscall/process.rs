@@ -41,27 +41,27 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 }
 
 // TODO: implement the syscall
-pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
-    match _trace_request {
+pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
+    match trace_request {
         0 => {
-            trace!("Trace request 0, id: {}, data: {}", _id, _data);
+            trace!("Trace request 0, id: {}, data: {}", id, data);
             unsafe { 
-                *(_id as *const usize) as isize
-            };
+                return *(id as *const usize) as isize;
+            }
         },
         1 => {
-            trace!("Trace request 1, id: {}, data: {}", _id, _data);
+            trace!("Trace request 1, id: {}, data: {}", id, data);
             unsafe {
-                let ptr = _id as *mut u8;
-                *ptr = _data as u8;
+                let ptr = id as *mut u8;
+                *ptr = data as u8;
             };
             return 0;
         },
         2 => {
-            trace!("Trace request 2, id: {}, data: {}", _id, _data);
-            return current_syscall_count(_id) as isize;
+            trace!("Trace request 2, id: {}, data: {}", id, data);
+            return current_syscall_count(id) as isize;
         }
-        _ => trace!("Unknown trace request: {}, id: {}, data: {}", _trace_request, _id, _data),
+        _ => trace!("Unknown trace request: {}, id: {}, data: {}", trace_request, id, data),
     }
     trace!("kernel: sys_trace");
     -1
