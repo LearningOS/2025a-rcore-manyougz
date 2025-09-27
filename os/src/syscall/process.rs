@@ -4,7 +4,7 @@ use crate::{
     timer::get_time_us,
 };
 
-use crate::task::{current_syscall_count, increase_syscall_count};
+use crate::task::current_syscall_count;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -23,7 +23,6 @@ pub fn sys_exit(exit_code: i32) -> ! {
 /// current task gives up resources for other tasks
 pub fn sys_yield() -> isize {
     trace!("kernel: sys_yield");
-    increase_syscall_count();
     suspend_current_and_run_next();
     0
 }
@@ -31,7 +30,6 @@ pub fn sys_yield() -> isize {
 /// get time with second and microsecond
 pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    increase_syscall_count();
     let us = get_time_us();
     unsafe {
         *ts = TimeVal {
@@ -44,24 +42,24 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 
 // TODO: implement the syscall
 pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
-    increase_syscall_count();
     match _trace_request {
         0 => {
             trace!("Trace request 0, id: {}, data: {}", _id, _data);
             unsafe { 
-                return (_id as *const usize).read_volatile() as isize;
+                *(_id as *const usize) as isize
             };
         },
         1 => {
             trace!("Trace request 1, id: {}, data: {}", _id, _data);
             unsafe {
-                (_id as *mut usize).write_volatile(_data);
+                let ptr = _id as *mut u8;
+                *ptr = _data as u8;
             };
             return 0;
         },
         2 => {
             trace!("Trace request 2, id: {}, data: {}", _id, _data);
-            return current_syscall_count() as isize;
+            return current_syscall_count(_id) as isize;
         }
         _ => trace!("Unknown trace request: {}, id: {}, data: {}", _trace_request, _id, _data),
     }

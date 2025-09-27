@@ -23,6 +23,8 @@ pub use task::{TaskControlBlock, TaskStatus};
 
 pub use context::TaskContext;
 
+use crate::syscall::TOTAL_SYSCALL_NUM;
+
 /// The task manager, where all the tasks are managed.
 ///
 /// Functions implemented on `TaskManager` deals with all task state transitions
@@ -45,8 +47,6 @@ pub struct TaskManagerInner {
     tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
-    /// syscall count
-    syscall_count: usize,
 }
 
 lazy_static! {
@@ -56,10 +56,12 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            syscall_count: [0; TOTAL_SYSCALL_NUM],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
             task.task_status = TaskStatus::Ready;
+            task.syscall_count = [0; TOTAL_SYSCALL_NUM];
         }
         TaskManager {
             num_app,
@@ -67,7 +69,6 @@ lazy_static! {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
                     current_task: 0,
-                    syscall_count: 0,
                 })
             },
         }
@@ -139,27 +140,43 @@ impl TaskManager {
         }
     }
 
+    /// Get index of current syscall count
+    fn get_syscall_index(&self, syscall_id: usize) -> usize {
+        let index = match syscall_id {
+            64 => 0,
+            93 => 1,
+            124 => 2,
+            169 => 3,
+            410 => 4,
+            _ => panic!("Unsupported syscall_id: {}", syscall_id)
+        };
+        index
+    }
+
     /// Get syscall count
-    fn current_syscall_count(&self) -> usize {
+    fn current_syscall_count(&self, syscall_id: usize) -> usize {
         let inner = self.inner.exclusive_access();
-        inner.syscall_count
+        let current = inner.current_task;
+        inner.tasks[current].syscall_count[self.get_syscall_index(syscall_id)].clone()
     }
 
     /// Increase syscall count by 1
-    pub fn increase_syscall_count(&self) {
+    fn increase_syscall_count(&self, syscall_id: usize) {
         let mut inner = self.inner.exclusive_access();
-        inner.syscall_count += 1;
+        let current = inner.current_task;
+        
+        inner.tasks[current].syscall_count[self.get_syscall_index(syscall_id)] += 1;
     }
 }
 
 /// Increase syscall count by 1
-pub fn increase_syscall_count() {
-    TASK_MANAGER.increase_syscall_count();
+pub fn increase_syscall_count(syscall_id: usize) {
+    TASK_MANAGER.increase_syscall_count(syscall_id);
 }
 
 /// Get syscall count
-pub fn current_syscall_count() -> usize {
-    TASK_MANAGER.current_syscall_count()
+pub fn current_syscall_count(syscall_id: usize) -> usize {
+    TASK_MANAGER.current_syscall_count(syscall_id)
 }
 
 /// Run the first task in task list.

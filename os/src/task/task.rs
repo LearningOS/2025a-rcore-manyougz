@@ -2,6 +2,8 @@
 
 use super::TaskContext;
 
+use crate::syscall::TOTAL_SYSCALL_NUM;
+
 /// The task control block (TCB) of a task.
 #[derive(Copy, Clone)]
 pub struct TaskControlBlock {
@@ -9,6 +11,8 @@ pub struct TaskControlBlock {
     pub task_status: TaskStatus,
     /// The task context
     pub task_cx: TaskContext,
+    /// syscall count
+    pub syscall_count: [usize; TOTAL_SYSCALL_NUM],
 }
 
 /// The status of a task
